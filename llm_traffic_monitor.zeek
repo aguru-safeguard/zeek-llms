@@ -3,6 +3,8 @@
 
 module LLM;
 
+option DEBUG = F;
+
 export {
     # Define the Info record first
     type Info: record {
@@ -82,36 +84,46 @@ const blacklist: set[string] = {
     "api.someuntrustedprovider.com",
 } &redef;
 
-event zeek_init() {
-    print "LLM Traffic Monitor script loaded!";
+function debug_print(msg: string)
+{
+    if (DEBUG)
+    {
+        print fmt("Debug: %s", msg);
+    }
+}
+
+event zeek_init()
+{
+    debug_print("LLM Traffic Monitor script loaded!");
     Log::create_stream(LLM::LOG, [$columns=Info, $path="llm_traffic"]);
 }
 
-function check_llm_provider(server_name: string, c: connection) {
-    print fmt("Debug: check_llm_provider called with server_name: %s", server_name);
+function check_llm_provider(server_name: string, c: connection)
+{
+    debug_print(fmt("check_llm_provider called with server_name: %s", server_name));
     
-    local status: string = "Unknown";
-    local provider: string = "Unknown";
+    local status: string;
+    local provider: string = server_name;
 
-    if (server_name in whitelist) {
+    if (server_name in whitelist)
+    {
         status = "Allowed (whitelisted)";
-    } else if (server_name in blacklist) {
+    }
+    else if (server_name in blacklist)
+    {
         status = "Blocked (blacklisted)";
-    } else if (server_name in llm_providers) {
+    }
+    else if (server_name in llm_providers)
+    {
         status = "Detected (unlisted)";
-    } else {
-        print fmt("Debug: server_name %s not found in any list", server_name);
+    }
+    else
+    {
+        debug_print(fmt("server_name %s not found in any list", server_name));
         return;
     }
 
-    for (p in llm_providers) {
-        if (p in server_name) {
-            provider = p;
-            break;
-        }
-    }
-
-    print fmt("Debug: Logging LLM traffic for %s (Status: %s, Provider: %s)", server_name, status, provider);
+    debug_print(fmt("Logging LLM traffic for %s (Status: %s, Provider: %s)", server_name, status, provider));
 
     local info: Info = [
         $ts=network_time(),
@@ -129,49 +141,31 @@ function check_llm_provider(server_name: string, c: connection) {
     Log::write(LLM::LOG, info);
 }
 
-event http_request(c: connection, method: string, original_URI: string, unescaped_URI: string, version: string) {
+event http_request(c: connection, method: string, original_URI: string, unescaped_URI: string, version: string)
+{
     local host = "";
-    if (c?$http && c$http?$host) {
+    if (c?$http && c$http?$host)
+    {
         host = c$http$host;
     }
-    print fmt("Debug: http_request event triggered for %s", host);
-    check_llm_provider(host, c);
-}
-
-event ssl_established(c: connection) {
-    print fmt("Debug: ssl_established event triggered");
-    if (c$ssl?$server_name) {
-        print fmt("Debug: SSL server_name: %s", c$ssl$server_name);
-        check_llm_provider(c$ssl$server_name, c);
-    } else {
-        print "Debug: No SSL server_name available";
-    }
-}
-
-event dns_request(c: connection, msg: dns_msg, query: string, qtype: count, qclass: count) {
-    print fmt("Debug: dns_request event triggered for query: %s", query);
-    check_llm_provider(query, c);
-}
-
-event ssl_extension_server_name(c: connection, is_orig: bool, names: string_vec)
-{
-    if (is_orig)
+    debug_print(fmt("http_request event triggered. Method: %s, URI: %s, Host: %s", method, original_URI, host));
+    
+    if (host == "")
     {
-        for (i in names)
+        debug_print("Host is empty. Checking URI for known providers...");
+        for (provider in llm_providers)
         {
-            local name = names[i];
-            print fmt("Debug: SSL SNI detected: %s", name);
-            check_llm_provider(name, c);
+            if (provider in original_URI)
+            {
+                debug_print(fmt("Found provider %s in URI %s", provider, original_URI));
+                check_llm_provider(provider, c);
+                return;
+            }
         }
     }
-}
-
-event http_header(c: connection, is_orig: bool, name: string, value: string)
-{
-    if (name == "HOST")
+    else
     {
-        print fmt("Debug: HTTP Host header detected: %s", value);
-        check_llm_provider(value, c);
+        check_llm_provider(host, c);
     }
 }
 
@@ -179,7 +173,28 @@ event ssl_established(c: connection)
 {
     if (c$ssl?$server_name)
     {
-        print fmt("Debug: SSL connection established with server name: %s", c$ssl$server_name);
+        debug_print(fmt("SSL connection established with server name: %s", c$ssl$server_name));
         check_llm_provider(c$ssl$server_name, c);
     }
+    else if (c$ssl?$subject)
+    {
+        debug_print(fmt("SSL connection established with subject: %s", c$ssl$subject));
+        check_llm_provider(c$ssl$subject, c);
+    }
+    else
+    {
+        debug_print(fmt("SSL connection established without server name or subject. Dest IP: %s", c$id$resp_h));
+    }
+}
+
+event dns_request(c: connection, msg: dns_msg, query: string, qtype: count, qclass: count)
+{
+    debug_print(fmt("dns_request event triggered for query: %s", query));
+    check_llm_provider(query, c);
+}
+
+event dns_A_reply(c: connection, msg: dns_msg, ans: dns_answer, a: addr)
+{
+    debug_print(fmt("DNS A reply for %s: %s", ans$query, a));
+    check_llm_provider(ans$query, c);
 }
