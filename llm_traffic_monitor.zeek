@@ -70,9 +70,19 @@ const llm_providers: set[string] = {
     "api.deepinfra.com",
     "api.runwayml.com",
     "api.textcortex.com",
-    "api.writesonic.com",
-    "api.copy.ai",
-    "api2.cursor.sh"
+    "api2.cursor.sh",
+    "api.cohere.com",
+    "api.github.com",
+    "api.clarifai.com",
+    "api.traceloop.com",
+    "api.autoai.dev",
+    "api.nvidia.com",
+    "api.groq.com",
+    "api.smith.langchain.com",
+    "api.galileo.myenterprise.com",
+    "api.litellm.ai",
+    "integrate.api.nvidia.com",
+    "api.honeycomb.io",
 } &redef;
 
 const whitelist: set[string] = {
