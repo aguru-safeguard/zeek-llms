@@ -83,6 +83,21 @@ const llm_providers: set[string] = {
     "api.litellm.ai",
     "integrate.api.nvidia.com",
     "api.honeycomb.io",
+    "openrouter.ai",
+    "glhf.chat",
+    "eu.api.ovh.com",
+    "ca.api.ovh.com",
+    "us.api.ovh.com",
+    "api.cloudflare.com",
+    "gateway.ai.cloudflare.com",
+    "api.lambdalabs.com",
+    "cloud.lambdalabs.com",
+    "api.cerebras.net",
+    "api.sambanova.ai",
+    "api.fireworks.ai",
+    "api.unify.ai",
+    "api.upstage.ai",
+    "api.hyperbolic.ai"
 } &redef;
 
 const whitelist: set[string] = {
